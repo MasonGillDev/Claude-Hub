@@ -6,6 +6,8 @@ It reads (read-only) from `~/.claude/` and writes its own state to `~/.claude-hu
 
 > The REST API under `app/api/*` is a first-class surface: other local apps consume it, so it's kept stable.
 
+📋 [TODO.md](TODO.md) — roadmap & open work · 🖥️ [docs/PORTING.md](docs/PORTING.md) — Linux/Windows porting guide
+
 ## Features
 
 - **Projects → sessions browser** — every project Claude Code has touched, with its sessions and last activity.
