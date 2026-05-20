@@ -21,9 +21,11 @@ It reads (read-only) from `~/.claude/` and writes its own state to `~/.claude-hu
 |---|---|
 | Dashboard UI + REST API | **this repo** (`app/`, `components/`, `lib/`) |
 | In-app bell / card pulse | **this repo** (`components/AttentionBell.tsx` + `app/api/events/*`) |
-| Native macOS notification banner | `~/.claude-hub/notify-hook.py` *(external hook, not in this repo)* |
-| Tool-call approval gating | `~/.claude-hub/approve-hook.py` *(PreToolUse hook, not in this repo)* |
-| Hook wiring | `~/.claude/settings.json` *(not in this repo)* |
+| Native macOS notification banner | runs from `~/.claude-hub/notify-hook.py` — vendored in `hooks/`, installed by `setup.sh` |
+| Tool-call approval gating | runs from `~/.claude-hub/approve-hook.py` (PreToolUse) — vendored in `hooks/`, installed by `setup.sh` |
+| Hook wiring | `~/.claude/settings.json` — written by `setup.sh` |
+
+> The two hooks **execute** from `~/.claude-hub/` (Claude Code's hooks reference absolute paths there); `hooks/` in this repo is the source of truth, and `setup.sh` copies them into place and wires `settings.json`.
 
 **Data sources**
 
@@ -53,15 +55,29 @@ It reads (read-only) from `~/.claude/` and writes its own state to `~/.claude-hu
 | `POST` | `/api/approvals` | Submit a pending tool-call approval |
 | `GET` `POST` `DELETE` | `/api/approvals/[id]` | Poll / decide / cancel an approval |
 
-## Development
+## Setup on a new Mac
 
-This setup uses a self-contained Node install at `~/.local/node` (no system Node / Homebrew required). Run `./install-node.sh` if you don't have it.
+There are two halves: the **dashboard app** (this repo) and the **hooks** that feed it notifications + approvals (vendored in `hooks/`, installed into `~/.claude-hub/`). State (`names.json`, `status.json`, etc.) does **not** need to migrate — the new Mac builds its own from its local `~/.claude/` data.
 
 ```bash
-# Ensure ~/.local/node/bin is on your PATH (a terminal that sources ~/.zshrc has it)
+git clone https://github.com/MasonGillDev/Claude-Hub.git
+cd Claude-Hub
+
+# 1. Dashboard
+./install-node.sh        # installs Node 22 (arm64) to ~/.local/node; skip if you have Node 18.18+/20+
 npm install
-npm run dev      # binds to http://127.0.0.1:3000
+npm run dev              # http://127.0.0.1:3000  (browse/rename/status/resume work now)
+
+# 2. Notifications + tool-call approvals (optional but recommended)
+./setup.sh               # copies hooks into ~/.claude-hub/ and wires ~/.claude/settings.json
+                         # then restart Claude Code so it picks up the hooks
 ```
+
+`setup.sh` is idempotent and backs up `settings.json` before editing. Without step 2, the core dashboard still works but the bell/banner/approvals stay dark (nothing posts to `/api/events`).
+
+**Caveats:** `install-node.sh` is Apple-Silicon only (hardcoded `darwin-arm64`); resume targets **Terminal.app** specifically; the app must run on **port 3000** unless you set `CLAUDE_HUB_PORT`. Clickable banners need an optional `terminal-notifier.app` in `~/.claude-hub/` — without it, banners fall back to plain (non-clickable) `osascript`.
+
+## Development
 
 | Script | Does |
 |---|---|
