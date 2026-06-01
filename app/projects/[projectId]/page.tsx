@@ -7,6 +7,7 @@ import { ResumeButton } from "@/components/ResumeButton";
 import { RenameField } from "@/components/RenameField";
 import { DeleteControl } from "@/components/DeleteControl";
 import { NewSessionButton } from "@/components/NewSessionButton";
+import { NewSdkSessionButton } from "@/components/NewSdkSessionButton";
 import { StatusControl } from "@/components/StatusControl";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,10 @@ export default async function ProjectPage({
           {sessions.length} session{sessions.length === 1 ? "" : "s"}
         </h2>
         <NewSessionButton projectId={id} />
+      </div>
+
+      <div className="mb-4">
+        <NewSdkSessionButton cwd={project.path} />
       </div>
 
       <div className="space-y-3">

@@ -13,6 +13,7 @@ import { DeleteControl } from "@/components/DeleteControl";
 import { SeenOnMount } from "@/components/SeenOnMount";
 import { StatusControl } from "@/components/StatusControl";
 import { ApprovalModeToggle } from "@/components/ApprovalModeToggle";
+import { SessionChat } from "@/components/SessionChat";
 import type { Interaction } from "@/lib/claude";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +96,9 @@ export default async function SessionPage({
       <div className="mt-6">
         <ApprovalModeToggle sessionId={s.id} initial={s.approvalMode} />
       </div>
+
+      {/* live chat — daemon-driven sessions; offers resume for idle ones */}
+      <SessionChat sessionId={s.id} running={s.running} />
 
       {/* away recap */}
       {s.recap && (

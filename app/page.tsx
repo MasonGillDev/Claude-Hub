@@ -4,6 +4,7 @@ import { gradientFor, initialsFor } from "@/lib/format";
 import { TimeAgo } from "@/components/TimeAgo";
 import { DeleteControl } from "@/components/DeleteControl";
 import { NewProjectButton } from "@/components/NewProjectButton";
+import { PendingActionsPanel } from "@/components/PendingActionsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,8 @@ export default function Home() {
           ))}
         </div>
       )}
+
+      <PendingActionsPanel />
     </div>
   );
 }

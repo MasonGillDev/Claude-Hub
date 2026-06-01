@@ -6,8 +6,15 @@ const HUB_DIR = path.join(os.homedir(), ".claude-hub");
 const MODE_FILE = path.join(HUB_DIR, "approval-mode.json");
 const APPROVALS_FILE = path.join(HUB_DIR, "approvals.json");
 
-/** Pending requests older than this are pruned (the hook should have cleaned up). */
+/** Pending hook requests older than this are pruned (the hook should have cleaned up). */
 const STALE_MS = 2 * 60 * 1000;
+/**
+ * SDK approvals are owned by the session daemon, which deletes them on decision
+ * or abort. Unlike the hook (a blocking subprocess capped at ~20s), an SDK
+ * session can pause and wait for a human, so these get a much longer safety-net
+ * TTL — only pruned if the daemon died without cleaning up.
+ */
+const STALE_MS_SDK = 30 * 60 * 1000;
 
 export type Decision = "pending" | "allow" | "deny";
 
@@ -20,6 +27,12 @@ export interface Approval {
   cwd: string | null;
   createdAt: string;
   decision: Decision;
+  /**
+   * Who created the request: the PreToolUse hook (terminal sessions) or the
+   * session daemon's canUseTool (SDK sessions). Controls the prune TTL.
+   * Defaults to "hook" for back-compat with existing entries.
+   */
+  source?: "hook" | "sdk";
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +85,8 @@ function prune(store: Record<string, Approval>): Record<string, Approval> {
   const now = Date.now();
   let changed = false;
   for (const [id, a] of Object.entries(store)) {
-    if (now - new Date(a.createdAt).getTime() > STALE_MS) {
+    const ttl = a.source === "sdk" ? STALE_MS_SDK : STALE_MS;
+    if (now - new Date(a.createdAt).getTime() > ttl) {
       delete store[id];
       changed = true;
     }
@@ -87,6 +101,7 @@ export function createApproval(
   const store = prune(loadApprovals());
   const approval: Approval = {
     ...a,
+    source: a.source ?? "hook",
     createdAt: new Date().toISOString(),
     decision: "pending",
   };

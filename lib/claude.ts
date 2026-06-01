@@ -4,6 +4,7 @@ import path from "node:path";
 import { getAttention, getAttentionFor, type AttentionEntry } from "./attention";
 import { getStatuses, getStatusFor, type SessionStatus } from "./status";
 import { getApprovalMode, pendingApprovalSessionIds } from "./approvals";
+import { loadDaemonRunning } from "./daemonLive";
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -201,7 +202,12 @@ function loadJobNames(): Map<string, string> {
   return map;
 }
 
-/** Set of sessionIds that currently have a live daemon process. */
+/**
+ * Set of sessionIds with a live, busy process — from two feeds, unioned:
+ *  - the terminal CLI's `~/.claude/sessions/*.json` (status: "busy"), and
+ *  - the SDK daemon's `~/.claude-hub/daemon-live.json` (sessions it's driving).
+ * So an in-app session shows "running" exactly like a terminal one.
+ */
 function loadRunningSessions(): Set<string> {
   const set = new Set<string>();
   for (const f of safeReadDir(SESSIONS_DIR)) {
@@ -211,6 +217,7 @@ function loadRunningSessions(): Set<string> {
     );
     if (info?.sessionId && info.status === "busy") set.add(info.sessionId);
   }
+  for (const id of loadDaemonRunning()) set.add(id);
   return set;
 }
 
@@ -233,6 +240,8 @@ function isHumanPrompt(entry: any): boolean {
 
 interface ParsedSession {
   aiTitle: string | null;
+  /** Native display name set via `claude -n` or `/rename` (persisted in the JSONL). */
+  customTitle: string | null;
   firstPrompt: string | null;
   lastPrompt: string | null;
   messageCount: number;
@@ -251,6 +260,7 @@ function parseSession(file: string): ParsedSession {
   const entries = readJsonl(file);
   const res: ParsedSession = {
     aiTitle: null,
+    customTitle: null,
     firstPrompt: null,
     lastPrompt: null,
     messageCount: 0,
@@ -278,6 +288,10 @@ function parseSession(file: string): ParsedSession {
     switch (e.type) {
       case "ai-title":
         if (typeof e.aiTitle === "string") res.aiTitle = e.aiTitle;
+        break;
+      case "custom-title":
+        // Native name from `claude -n <name>` or `/rename`. Latest wins.
+        if (typeof e.customTitle === "string") res.customTitle = e.customTitle;
         break;
       case "user": {
         if (!isHumanPrompt(e)) break;
@@ -341,13 +355,19 @@ function statMtime(file: string): number {
 
 function resolveName(
   id: string,
-  parsed: { aiTitle: string | null; firstPrompt: string | null },
+  parsed: {
+    aiTitle: string | null;
+    customTitle: string | null;
+    firstPrompt: string | null;
+  },
   customNames: Record<string, string>,
   jobNames: Map<string, string>,
 ): { name: string; nameSource: SessionSummary["nameSource"] } {
   if (customNames[id]) return { name: customNames[id], nameSource: "custom" };
   const job = jobNames.get(id);
   if (job) return { name: job, nameSource: "job" };
+  // Native name from `claude -n` / `/rename` (interactive sessions, no job entry).
+  if (parsed.customTitle) return { name: parsed.customTitle, nameSource: "job" };
   if (parsed.aiTitle) return { name: parsed.aiTitle, nameSource: "title" };
   if (parsed.firstPrompt)
     return { name: truncate(parsed.firstPrompt, 60), nameSource: "prompt" };

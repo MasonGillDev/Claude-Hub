@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { AttentionBell } from "@/components/AttentionBell";
-import { ApprovalsTray } from "@/components/ApprovalsTray";
 
 export const metadata: Metadata = {
   title: "Claude Hub",
@@ -35,7 +34,6 @@ export default function RootLayout({
               </div>
             </Link>
             <div className="flex items-center gap-2">
-              <ApprovalsTray />
               <AttentionBell />
             </div>
           </div>
