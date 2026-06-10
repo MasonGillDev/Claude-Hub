@@ -8,6 +8,7 @@ import {
 import type { CoreProject } from "@/core/index";
 import { gradientFor, initialsFor } from "@/lib/format";
 import { TimeAgo } from "@/components/TimeAgo";
+import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 
 /**
  * One section per configured remote device (~/.claude-hub/devices.json) with
@@ -27,7 +28,7 @@ export async function RemoteDeviceSections() {
   );
 
   return (
-    <div className="mt-12 space-y-10">
+    <div className="mt-8 space-y-6">
       {results.map(({ device, result }) => (
         <DeviceSection key={device.id} device={device} result={result} />
       ))}
@@ -48,29 +49,36 @@ function DeviceSection({
     : (result.fetchedAt ?? deviceLastSeen(device.id));
 
   return (
-    <section>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-faint">
-          🖥 {device.name}
-        </h2>
-        {result.online ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            online
+    <CollapsiblePanel
+      storageKey={`device-panel:${device.id}`}
+      accent={gradientFor(device.id)}
+      header={
+        <>
+          <span className="text-sm font-semibold uppercase tracking-wide text-ink-soft">
+            🖥 {device.name}
           </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-            offline
-            {lastSeen && (
-              <span className="font-normal text-slate-500">
-                · last seen <TimeAgo iso={lastSeen} />
-              </span>
-            )}
+          {result.online ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              online
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+              offline
+              {lastSeen && (
+                <span className="font-normal text-slate-500">
+                  · last seen <TimeAgo iso={lastSeen} />
+                </span>
+              )}
+            </span>
+          )}
+          <span className="text-xs text-ink-faint">
+            {projects.length} project{projects.length === 1 ? "" : "s"}
           </span>
-        )}
-      </div>
-
+        </>
+      }
+    >
       {projects.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-200 bg-white/50 px-5 py-4 text-sm text-ink-faint">
           {result.online
@@ -133,6 +141,6 @@ function DeviceSection({
           ))}
         </div>
       )}
-    </section>
+    </CollapsiblePanel>
   );
 }

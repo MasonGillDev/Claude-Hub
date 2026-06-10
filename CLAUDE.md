@@ -59,4 +59,4 @@ Pending approvals drive an indigo "awaiting approval" pulse (top priority over a
 
 ## Dev
 
-`npm run dev` (needs `~/.local/node/bin` on PATH; e.g. a terminal where `~/.zshrc` is sourced). Binds to `127.0.0.1:3000`.
+`npm run dev` (needs `~/.local/node/bin` on PATH; e.g. a terminal where `~/.zshrc` is sourced). Listens on all interfaces, port 3000 — reachable over the LAN at `http://<this-Mac's-IP>:3000`, with NO auth on the UI or API.
