@@ -1,15 +1,19 @@
+import os from "node:os";
 import Link from "next/link";
 import { getProjects } from "@/lib/claude";
+import { getDevices } from "@/lib/devices";
 import { gradientFor, initialsFor } from "@/lib/format";
 import { TimeAgo } from "@/components/TimeAgo";
 import { DeleteControl } from "@/components/DeleteControl";
 import { NewProjectButton } from "@/components/NewProjectButton";
 import { PendingActionsPanel } from "@/components/PendingActionsPanel";
+import { RemoteDeviceSections } from "@/components/RemoteDeviceSections";
 
 export const dynamic = "force-dynamic";
 
 export default function Home() {
   const projects = getProjects();
+  const hasRemoteDevices = getDevices().length > 0;
 
   return (
     <div className="animate-fade-up">
@@ -18,11 +22,22 @@ export default function Home() {
           <h1 className="text-3xl font-bold tracking-tight">Your projects</h1>
           <p className="mt-1 text-ink-soft">
             {projects.length} project{projects.length === 1 ? "" : "s"} with Claude
-            Code sessions. Pick one to dive in.
+            Code sessions{hasRemoteDevices ? " on this Mac" : ""}. Pick one to dive in.
           </p>
         </div>
         <NewProjectButton />
       </div>
+
+      {hasRemoteDevices && (
+        <div className="mb-4 flex items-center gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-faint">
+            💻 This Mac · {os.hostname()}
+          </h2>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-700">
+            local
+          </span>
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <EmptyState />
@@ -100,6 +115,8 @@ export default function Home() {
           ))}
         </div>
       )}
+
+      <RemoteDeviceSections />
 
       <PendingActionsPanel />
     </div>

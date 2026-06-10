@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "agent": "tsx agent/index.ts",
     "daemon": "tsx daemon/index.ts",
     "daemon:watch": "tsx watch daemon/index.ts",
     "build": "next build",

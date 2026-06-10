@@ -1,0 +1,12 @@
+{
+  "name": "claude-hub-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude Hub device agent — serves this machine's Claude Code sessions to the hub over the LAN",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.22.3"
+  }
+}

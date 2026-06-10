@@ -1,55 +1,79 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/claude";
+import { getDevice } from "@/lib/devices";
+import { fetchAgentSession } from "@/lib/agentClient";
 import {
   formatDateTime,
   gradientFor,
   nameSourceLabel,
   relativeTime,
 } from "@/lib/format";
-import { ResumeButton } from "@/components/ResumeButton";
-import { RenameField } from "@/components/RenameField";
-import { DeleteControl } from "@/components/DeleteControl";
-import { SeenOnMount } from "@/components/SeenOnMount";
-import { StatusControl } from "@/components/StatusControl";
-import { ApprovalModeToggle } from "@/components/ApprovalModeToggle";
-import { SessionChat } from "@/components/SessionChat";
 import { Badge, Bubble, Meta } from "@/components/SessionBits";
 
 export const dynamic = "force-dynamic";
 
-export default async function SessionPage({
+/** Read-only detail view of a session living on a remote device. */
+export default async function RemoteSessionPage({
   params,
 }: {
-  params: Promise<{ sessionId: string }>;
+  params: Promise<{ deviceId: string; sessionId: string }>;
 }) {
-  const { sessionId } = await params;
-  const s = getSession(sessionId);
-  if (!s) notFound();
+  const { deviceId, sessionId } = await params;
+  const device = getDevice(decodeURIComponent(deviceId));
+  if (!device) notFound();
+
+  const result = await fetchAgentSession(device, decodeURIComponent(sessionId));
+  const s = result.data;
+  if (!s && result.online) notFound();
+  if (!s) {
+    return (
+      <div className="animate-fade-up">
+        <Link
+          href="/"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm text-ink-soft transition hover:text-ink"
+        >
+          <span aria-hidden>←</span> All projects
+        </Link>
+        <div className="rounded-3xl border border-amber-200 bg-amber-50/80 p-8 text-center">
+          <h1 className="text-lg font-semibold text-amber-900">
+            {device.name} is offline
+          </h1>
+          <p className="mt-1 text-sm text-amber-800">
+            No snapshot of this session yet — it will load once the hub can reach
+            the device&apos;s agent.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-up">
-      <SeenOnMount sessionId={s.id} />
       <Link
-        href={`/projects/${encodeURIComponent(s.projectId)}`}
+        href={`/devices/${encodeURIComponent(device.id)}/projects/${encodeURIComponent(s.projectId)}`}
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-ink-soft transition hover:text-ink"
       >
         <span aria-hidden>←</span> Back to project
       </Link>
+
+      {!result.online && (
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+          {device.name} is offline — showing a snapshot from{" "}
+          {relativeTime(result.fetchedAt)}.
+        </div>
+      )}
 
       {/* header */}
       <div className="overflow-hidden rounded-3xl border border-white/70 glass shadow-soft">
         <div className="h-2 w-full" style={{ background: gradientFor(s.id) }} />
         <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <RenameField
-              sessionId={s.id}
-              initialName={s.name}
-              initialCustom={s.customName}
-              variant="block"
-            />
+            <h1 className="truncate text-xl font-bold tracking-tight">{s.name}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <Badge>{nameSourceLabel[s.nameSource] ?? s.nameSource}</Badge>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600">
+                🖥 {device.name} · read-only
+              </span>
               {s.running && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 font-medium text-emerald-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -59,17 +83,7 @@ export default async function SessionPage({
               {s.aiTitle && s.nameSource !== "title" && (
                 <Badge>title: {s.aiTitle}</Badge>
               )}
-              <StatusControl sessionId={s.id} status={s.status} alwaysShow />
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <ResumeButton sessionId={s.id} running={s.running} />
-            <DeleteControl
-              url={`/api/sessions/${s.id}`}
-              prompt="Delete this session?"
-              after={{ type: "push", href: `/projects/${encodeURIComponent(s.projectId)}` }}
-              size="md"
-            />
           </div>
         </div>
 
@@ -91,14 +105,6 @@ export default async function SessionPage({
         {s.version && <span className="font-mono">claude {s.version}</span>}
         <span className="font-mono">id: {s.id}</span>
       </div>
-
-      {/* approve-from-dashboard toggle */}
-      <div className="mt-6">
-        <ApprovalModeToggle sessionId={s.id} initial={s.approvalMode} />
-      </div>
-
-      {/* live chat — daemon-driven sessions; offers resume for idle ones */}
-      <SessionChat sessionId={s.id} running={s.running} />
 
       {/* away recap */}
       {s.recap && (

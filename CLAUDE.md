@@ -2,6 +2,10 @@
 
 Local Next.js (App Router, TS, Tailwind) dashboard for managing **Claude Code sessions** across projects: browse projects → sessions, rename, see last interaction, resume/focus the session's terminal, get notified when a session needs attention, and flag sessions Open/Finished. The REST API under `app/api/*` is a first-class surface — other local apps consume it, so keep it stable.
 
+## Multi-device (hub + agents)
+
+This Mac is the **hub**; other devices (second Mac, Windows) run the read-only **device agent** (`agent/index.ts`, port 3777, bearer-token auth) which serves their `~/.claude` over the LAN. Shared read logic lives in `core/` (dependency-free, platform-neutral — used in-process by the hub for the local device and by agents on remotes; `lib/claude.ts` = core + hub-only sidecar overlays). The hub polls agents per request and keeps last-good snapshots in `~/.claude-hub/device-cache/` so offline devices still render (dimmed). Config: hub-side registry `~/.claude-hub/devices.json`; agent-side `~/.claude-hub/agent.json` (token generated on first run). Remote UI is read-only at `/devices/[deviceId]/...`; remote REST under `/api/devices/*`. Full details + install steps: `docs/DEVICES.md`.
+
 ## ⚠️ Parts of this system live OUTSIDE this repo
 
 Several behaviors are NOT implemented in this codebase. Grepping the repo will not find them — they live in the user's home dir:
@@ -44,11 +48,14 @@ Pending approvals drive an indigo "awaiting approval" pulse (top priority over a
 
 ## Key code
 
-- `lib/claude.ts` — reads `~/.claude`, builds projects/sessions, resolves display name (sidecar > job name > ai-title > first prompt > id), running, attention, status. Running (busy) suppresses attention — a session can't be both.
+- `core/` — device-portable read layer for `~/.claude` (projects/sessions/transcript parsing, job names, CLI running set). No deps, runs on the hub AND inside agents on other devices. Don't import hub sidecars here.
+- `lib/claude.ts` — LOCAL device view: `core/` + hub-only overlays (sidecar custom names, attention, status, approvals, SDK-daemon running). Display name precedence: sidecar > job name > ai-title > first prompt > id. Running (busy) suppresses attention — a session can't be both.
+- `agent/` — device agent for remotes (own `package.json`, only dep `tsx`; `npm run agent` to run locally).
+- `lib/devices.ts`, `lib/agentClient.ts` — device registry + agent HTTP client with snapshot cache.
 - `lib/attention.ts`, `lib/status.ts` — sidecar stores.
 - `lib/resume.ts` — Terminal.app focus (pid → tty → tab, AXRaise for cross-Space) and `claude --resume` fallback. NOT notifications.
-- `app/api/*` — REST API (projects, sessions, events, resume).
-- `components/` — `AttentionBell` (in-app notifications), `ResumeButton` (focus/resume), `RenameField`, `StatusControl`, `DeleteControl`, `New{Session,Project}Button`.
+- `app/api/*` — REST API (projects, sessions, events, resume, devices).
+- `components/` — `AttentionBell` (in-app notifications), `ResumeButton` (focus/resume), `RenameField`, `StatusControl`, `DeleteControl`, `New{Session,Project}Button`, `RemoteDeviceSections` (home-page device grids), `SessionBits` (shared session-detail pieces).
 
 ## Dev
 
