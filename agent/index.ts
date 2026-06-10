@@ -20,15 +20,18 @@ import {
  * generated token. Register the device on the hub by copying that token into
  * the hub's ~/.claude-hub/devices.json (see docs/DEVICES.md).
  *
- * Endpoints (all GET, all token-gated):
- *   /v1/info                          device name, platform, agent version
- *   /v1/projects                      CoreProject[]
- *   /v1/projects/:id/sessions         CoreSession[]
- *   /v1/sessions/:id                  CoreSessionDetail
- *   /v1/sessions/:id/transcript       raw transcript JSONL
+ * Endpoints (token-gated):
+ *   GET  /v1/info                     device name, platform, agent version
+ *   GET  /v1/projects                 CoreProject[]
+ *   GET  /v1/projects/:id/sessions    CoreSession[]
+ *   GET  /v1/sessions/:id             CoreSessionDetail + approvalMode
+ *   GET  /v1/sessions/:id/transcript  raw transcript JSONL
+ *   POST /v1/approval-mode            {sessionId, on} -> toggles this device's
+ *                                     ~/.claude-hub/approval-mode.json (read by
+ *                                     its approve-hook.py)
  */
 
-const AGENT_VERSION = "0.1.0";
+const AGENT_VERSION = "0.2.0";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -88,11 +91,54 @@ function safeSegment(s: string): boolean {
   return s.length > 0 && !s.includes("/") && !s.includes("\\") && !s.includes("..");
 }
 
+function readJsonBody(req: http.IncomingMessage): Promise<any | null> {
+  return new Promise((resolve) => {
+    let data = "";
+    req.on("data", (chunk) => {
+      data += chunk;
+      if (data.length > 1_000_000) {
+        resolve(null);
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(data));
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on("error", () => resolve(null));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Per-session approval mode (this device's sidecar, read by its approve-hook)
+// ---------------------------------------------------------------------------
+
+const APPROVAL_MODE_FILE = path.join(HUB_DIR, "approval-mode.json");
+
+function loadApprovalModes(): Record<string, boolean> {
+  try {
+    return JSON.parse(fs.readFileSync(APPROVAL_MODE_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function setApprovalMode(sessionId: string, on: boolean): void {
+  const modes = loadApprovalModes();
+  if (on) modes[sessionId] = true;
+  else delete modes[sessionId];
+  fs.mkdirSync(HUB_DIR, { recursive: true });
+  fs.writeFileSync(APPROVAL_MODE_FILE, JSON.stringify(modes, null, 2));
+}
+
 // ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const started = Date.now();
   const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
 
@@ -106,8 +152,18 @@ const server = http.createServer((req, res) => {
   const json = (status: number, data: unknown) =>
     finish(status, JSON.stringify(data), "application/json");
 
-  if (req.method !== "GET") return json(405, { error: "Method not allowed" });
   if (!authorized(req)) return json(401, { error: "Missing or invalid token" });
+
+  if (req.method === "POST" && pathname === "/v1/approval-mode") {
+    const body = await readJsonBody(req);
+    if (!body || typeof body.sessionId !== "string" || typeof body.on !== "boolean") {
+      return json(400, { error: "Body must be {sessionId: string, on: boolean}" });
+    }
+    setApprovalMode(body.sessionId, body.on);
+    return json(200, { ok: true, sessionId: body.sessionId, on: body.on });
+  }
+
+  if (req.method !== "GET") return json(405, { error: "Method not allowed" });
 
   try {
     if (pathname === "/v1/info") {
@@ -138,7 +194,10 @@ const server = http.createServer((req, res) => {
       if (!safeSegment(sessionId)) return json(400, { error: "Bad session id" });
       const session = getSessionDetail(sessionId);
       if (!session) return json(404, { error: "Session not found" });
-      return json(200, session);
+      return json(200, {
+        ...session,
+        approvalMode: loadApprovalModes()[sessionId] === true,
+      });
     }
 
     m = /^\/v1\/sessions\/([^/]+)\/transcript$/.exec(pathname);

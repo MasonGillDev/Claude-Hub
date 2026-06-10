@@ -20,6 +20,9 @@ export interface AgentInfo {
   time: string;
 }
 
+/** Session detail as the agent serves it: core data + that device's approval-mode flag. */
+export type AgentSessionDetail = CoreSessionDetail & { approvalMode?: boolean };
+
 export interface AgentResult<T> {
   /** Whether the device answered just now. false ⇒ `data` is the cached snapshot, if any. */
   online: boolean;
@@ -117,9 +120,36 @@ export function fetchAgentSessions(
 export function fetchAgentSession(
   device: DeviceConfig,
   sessionId: string,
-): Promise<AgentResult<CoreSessionDetail>> {
-  return agentGet<CoreSessionDetail>(
+): Promise<AgentResult<AgentSessionDetail>> {
+  return agentGet<AgentSessionDetail>(
     device,
     `/v1/sessions/${encodeURIComponent(sessionId)}`,
   );
+}
+
+/** Toggle approval mode for a session ON ITS DEVICE (writes that machine's
+ *  approval-mode.json via the agent — no snapshot fallback for writes). */
+export async function postAgentApprovalMode(
+  device: DeviceConfig,
+  sessionId: string,
+  on: boolean,
+): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const res = await fetch(`${device.url}/v1/approval-mode`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${device.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ sessionId, on }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      return { ok: false, error: body?.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, error: null };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }

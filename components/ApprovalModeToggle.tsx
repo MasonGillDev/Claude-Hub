@@ -6,9 +6,13 @@ import { useState } from "react";
 export function ApprovalModeToggle({
   sessionId,
   initial,
+  endpoint,
 }: {
   sessionId: string;
   initial: boolean;
+  /** PATCH target; defaults to the local session route. Remote session pages
+   *  point this at /api/devices/.../approval-mode (same {approvalMode} body). */
+  endpoint?: string;
 }) {
   const router = useRouter();
   const [on, setOn] = useState(initial);
@@ -19,7 +23,7 @@ export function ApprovalModeToggle({
     setOn(next);
     setSaving(true);
     try {
-      await fetch(`/api/sessions/${sessionId}`, {
+      await fetch(endpoint ?? `/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ approvalMode: next }),

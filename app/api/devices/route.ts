@@ -11,7 +11,9 @@ export async function GET() {
       const info = await fetchAgentInfo(d);
       return {
         id: d.id,
-        name: info.data?.name ?? d.name,
+        // Registry name wins — it's the user's explicit label for the device.
+        name: d.name,
+        agentName: info.data?.name ?? null,
         url: d.url,
         online: info.online,
         platform: info.data?.platform ?? null,

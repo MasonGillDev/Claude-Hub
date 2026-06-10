@@ -25,6 +25,8 @@ export interface Approval {
   /** Raw tool input (e.g. { command } for Bash, { file_path } for Edit). */
   input: Record<string, unknown>;
   cwd: string | null;
+  /** Registry id of the device the session lives on; null/absent = this machine. */
+  deviceId?: string | null;
   createdAt: string;
   decision: Decision;
   /**

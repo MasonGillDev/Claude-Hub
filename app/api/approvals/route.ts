@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     tool?: unknown;
     input?: unknown;
     cwd?: unknown;
+    deviceId?: unknown;
   };
   try {
     body = await req.json();
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
         ? (body.input as Record<string, unknown>)
         : {},
     cwd: typeof body.cwd === "string" ? body.cwd : null,
+    deviceId: typeof body.deviceId === "string" ? body.deviceId : null,
   });
   return NextResponse.json({ approval });
 }

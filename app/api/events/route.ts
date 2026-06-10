@@ -65,6 +65,11 @@ export async function POST(req: Request) {
       ? body.message.trim()
       : null;
   const cwd = typeof body.cwd === "string" ? body.cwd : null;
-  setAttention(sessionId, mapped, message, cwd);
+  // Remote devices' hooks tag events with their registry id (see hooks/install.py).
+  const deviceId =
+    typeof (body.device_id ?? body.deviceId) === "string"
+      ? ((body.device_id ?? body.deviceId) as string)
+      : null;
+  setAttention(sessionId, mapped, message, cwd, deviceId);
   return NextResponse.json({ ok: true, event: mapped });
 }

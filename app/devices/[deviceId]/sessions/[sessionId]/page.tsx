@@ -9,6 +9,8 @@ import {
   relativeTime,
 } from "@/lib/format";
 import { Badge, Bubble, Meta } from "@/components/SessionBits";
+import { SeenOnMount } from "@/components/SeenOnMount";
+import { ApprovalModeToggle } from "@/components/ApprovalModeToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +51,7 @@ export default async function RemoteSessionPage({
 
   return (
     <div className="animate-fade-up">
+      <SeenOnMount sessionId={s.id} />
       <Link
         href={`/devices/${encodeURIComponent(device.id)}/projects/${encodeURIComponent(s.projectId)}`}
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-ink-soft transition hover:text-ink"
@@ -105,6 +108,17 @@ export default async function RemoteSessionPage({
         {s.version && <span className="font-mono">claude {s.version}</span>}
         <span className="font-mono">id: {s.id}</span>
       </div>
+
+      {/* approve-from-dashboard toggle — writes the remote device's sidecar via its agent */}
+      {result.online && (
+        <div className="mt-6">
+          <ApprovalModeToggle
+            sessionId={s.id}
+            initial={s.approvalMode ?? false}
+            endpoint={`/api/devices/${encodeURIComponent(device.id)}/sessions/${s.id}/approval-mode`}
+          />
+        </div>
+      )}
 
       {/* away recap */}
       {s.recap && (

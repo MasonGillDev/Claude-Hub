@@ -10,13 +10,16 @@ interface Approval {
   tool: string;
   input: Record<string, unknown>;
   cwd: string | null;
+  /** Set when the request came from a remote device's approve-hook. */
+  deviceId?: string | null;
   createdAt: string;
   source?: "hook" | "sdk";
 }
 
 function basename(p: string | null): string {
   if (!p) return "session";
-  const parts = p.replace(/\/+$/, "").split("/");
+  // Handles both / and \ — remote cwds may come from Windows.
+  const parts = p.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
 
@@ -144,6 +147,11 @@ export function PendingActionsPanel() {
                         {a.tool}
                       </span>
                       <span className="truncate font-mono">{basename(a.cwd)}</span>
+                      {a.deviceId && (
+                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">
+                          on {a.deviceId}
+                        </span>
+                      )}
                       {a.source === "sdk" && (
                         <span className="rounded-full bg-violet-100 px-1.5 py-0.5 font-medium text-violet-700">
                           in-app

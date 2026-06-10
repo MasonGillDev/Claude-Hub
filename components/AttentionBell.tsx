@@ -10,6 +10,8 @@ interface Entry {
   message: string | null;
   at: string;
   cwd: string | null;
+  /** Set when the session lives on a remote device (links to its device page). */
+  deviceId?: string | null;
 }
 
 const META: Record<Entry["event"], { label: string; dot: string }> = {
@@ -20,7 +22,8 @@ const META: Record<Entry["event"], { label: string; dot: string }> = {
 
 function basename(p: string | null): string {
   if (!p) return "session";
-  const parts = p.replace(/\/+$/, "").split("/");
+  // Handles both / and \ — remote cwds may come from Windows.
+  const parts = p.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
 
@@ -135,7 +138,11 @@ export function AttentionBell() {
                 {items.map(([id, e]) => (
                   <li key={id}>
                     <Link
-                      href={`/sessions/${id}`}
+                      href={
+                        e.deviceId
+                          ? `/devices/${encodeURIComponent(e.deviceId)}/sessions/${id}`
+                          : `/sessions/${id}`
+                      }
                       onClick={() => setOpen(false)}
                       className="flex items-start gap-2.5 px-4 py-3 transition hover:bg-white/60"
                     >
@@ -144,8 +151,15 @@ export function AttentionBell() {
                       />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-medium">
-                            {basename(e.cwd)}
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate text-sm font-medium">
+                              {basename(e.cwd)}
+                            </span>
+                            {e.deviceId && (
+                              <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                {e.deviceId}
+                              </span>
+                            )}
                           </span>
                           <span className="shrink-0 text-xs text-ink-faint">
                             {relativeTime(e.at)}

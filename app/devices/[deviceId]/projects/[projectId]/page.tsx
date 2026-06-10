@@ -7,6 +7,8 @@ import {
   fetchAgentSessions,
 } from "@/lib/agentClient";
 import { decodeProjectId } from "@/core/index";
+import { getAttention } from "@/lib/attention";
+import { pendingApprovalSessionIds } from "@/lib/approvals";
 import { gradientFor, initialsFor, nameSourceLabel } from "@/lib/format";
 import { TimeAgo } from "@/components/TimeAgo";
 
@@ -35,6 +37,11 @@ export default async function RemoteProjectPage({
   const lastSeen = sessionsRes.online
     ? null
     : (sessionsRes.fetchedAt ?? deviceLastSeen(device.id));
+
+  // Attention/approvals live in the hub's sidecars (fed by the device's hooks),
+  // keyed by session id — so they overlay remote sessions directly.
+  const attention = getAttention();
+  const pendingApprovals = new Set(pendingApprovalSessionIds());
 
   return (
     <div className="animate-fade-up">
@@ -89,10 +96,21 @@ export default async function RemoteProjectPage({
       </h2>
 
       <div className={`space-y-3 ${sessionsRes.online ? "" : "opacity-70 saturate-50"}`}>
-        {sessions.map((s) => (
+        {sessions.map((s) => {
+          const att = s.running ? null : (attention[s.id] ?? null);
+          const pending = pendingApprovals.has(s.id);
+          return (
           <div
             key={s.id}
-            className="group relative overflow-hidden rounded-2xl border border-white/70 glass p-4 shadow-soft transition hover:shadow-lift"
+            className={`group relative overflow-hidden rounded-2xl border glass p-4 shadow-soft transition hover:shadow-lift ${
+              pending
+                ? "border-indigo-300 ring-2 ring-indigo-400/80"
+                : att
+                  ? att.event === "needs_input"
+                    ? "border-rose-300 ring-2 ring-rose-400/70"
+                    : "border-amber-300 ring-2 ring-amber-400/70"
+                  : "border-white/70"
+            }`}
           >
             <Link
               href={`/devices/${encodeURIComponent(device.id)}/sessions/${s.id}`}
@@ -105,6 +123,32 @@ export default async function RemoteProjectPage({
                 <span className="truncate text-sm font-semibold">{s.name}</span>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
                   <span>{nameSourceLabel[s.nameSource] ?? s.nameSource}</span>
+                  {pending && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse-ring-indigo" />
+                      awaiting approval
+                    </span>
+                  )}
+                  {att && (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${
+                        att.event === "needs_input"
+                          ? "bg-rose-100 text-rose-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full animate-pulse-ring ${
+                          att.event === "needs_input" ? "bg-rose-500" : "bg-amber-500"
+                        }`}
+                      />
+                      {att.event === "needs_input"
+                        ? "needs you"
+                        : att.event === "subagent_done"
+                          ? "subagent done"
+                          : "your turn"}
+                    </span>
+                  )}
                   {s.running && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -130,7 +174,8 @@ export default async function RemoteProjectPage({
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {sessions.length === 0 && (
           <p className="rounded-2xl border border-dashed border-slate-200 bg-white/50 px-5 py-4 text-sm text-ink-faint">
             No sessions to show.

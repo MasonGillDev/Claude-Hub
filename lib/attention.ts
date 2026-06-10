@@ -12,6 +12,8 @@ export interface AttentionEntry {
   message: string | null;
   at: string;
   cwd: string | null;
+  /** Registry id of the device the session lives on; null/absent = this machine. */
+  deviceId?: string | null;
 }
 
 type Store = Record<string, AttentionEntry>;
@@ -42,9 +44,10 @@ export function setAttention(
   event: AttentionEvent,
   message: string | null,
   cwd: string | null,
+  deviceId: string | null = null,
 ): void {
   const store = load();
-  store[sessionId] = { event, message, at: new Date().toISOString(), cwd };
+  store[sessionId] = { event, message, at: new Date().toISOString(), cwd, deviceId };
   save(store);
 }
 

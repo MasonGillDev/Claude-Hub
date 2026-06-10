@@ -1,4 +1,4 @@
-# Multi-device federation (phase 1: read-only)
+# Multi-device federation
 
 The hub (this Mac) shows sessions from other machines by polling a small
 **device agent** running on each of them. The agent is read-only: it serves
@@ -95,6 +95,39 @@ Hub-side REST (other local apps can consume these):
 `/api/devices`, `/api/devices/:id/projects`,
 `/api/devices/:id/projects/:projectId/sessions`, `/api/devices/:id/sessions/:sessionId`.
 
+## Phase 2: cross-device notifications + approvals
+
+The notify/approve hooks (vendored in `hooks/`) are hub-aware: they read
+`~/.claude-hub/hub.json` (`{"url": ..., "deviceId": ...}`) and fall back to
+`http://127.0.0.1:3000` when it's absent — so the hub machine's behavior is
+unchanged. On remote devices, events/approvals POST to the hub tagged with
+`deviceId`, which makes the bell, card pulses, and approvals tray work for
+sessions on any machine (links route to `/devices/<id>/...`). Native banners:
+terminal-notifier/osascript on macOS, a PowerShell balloon on Windows.
+
+Install on each device (after `git pull`; needs Python 3, which macOS has and
+Windows users likely installed alongside Claude Code):
+
+```sh
+# hub Mac (no args — local behavior, just refreshes the installed scripts):
+python3 hooks/install.py
+
+# other Mac:
+python3 hooks/install.py --hub-url http://192.168.1.141:3000 --device-id <id-from-devices.json>
+
+# Windows (PowerShell):
+python hooks\install.py --hub-url http://192.168.1.141:3000 --device-id masonpc
+```
+
+The installer copies the hooks into `~/.claude-hub/`, writes `hub.json`, and
+(re)wires `~/.claude/settings.json` idempotently (backup written next to it).
+Restart Claude Code on that device afterwards.
+
+**Approval mode for remote sessions** is toggled from the hub's remote session
+page; the hub calls the device agent's `POST /v1/approval-mode`, which writes
+that machine's `~/.claude-hub/approval-mode.json` (read by its approve-hook).
+Requires agent ≥ 0.2.0 — `git pull` + restart the agent on each device.
+
 ## Security model
 
 Plain HTTP on the home LAN with a per-device bearer token (generated,
@@ -105,8 +138,6 @@ browser (all agent calls are server-side).
 
 ## Roadmap
 
-- **Phase 2** — point remote devices' `notify-hook.py`/`approve-hook.py` at the
-  hub's URL: cross-device attention + tool-call approvals.
 - **Phase 3** — session **porting**: copy a transcript from another device,
   rewrite `cwd`, resume locally (`/v1/sessions/:id/transcript` already exists).
 - **Phase 4** — remote drive: interact with sessions running on other devices

@@ -6,6 +6,8 @@ import {
   type AgentResult,
 } from "@/lib/agentClient";
 import type { CoreProject } from "@/core/index";
+import { getAttention } from "@/lib/attention";
+import { listPendingApprovals } from "@/lib/approvals";
 import { gradientFor, initialsFor } from "@/lib/format";
 import { TimeAgo } from "@/components/TimeAgo";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
@@ -47,6 +49,21 @@ function DeviceSection({
   const lastSeen = result.online
     ? null
     : (result.fetchedAt ?? deviceLastSeen(device.id));
+
+  // Hub-side sidecars (fed by this device's hooks) tag entries with deviceId +
+  // cwd; match cwd against project paths to badge the right cards.
+  const attentionByPath: Record<string, number> = {};
+  for (const e of Object.values(getAttention())) {
+    if (e.deviceId === device.id && e.cwd) {
+      attentionByPath[e.cwd] = (attentionByPath[e.cwd] ?? 0) + 1;
+    }
+  }
+  const approvalsByPath: Record<string, number> = {};
+  for (const a of listPendingApprovals()) {
+    if (a.deviceId === device.id && a.cwd) {
+      approvalsByPath[a.cwd] = (approvalsByPath[a.cwd] ?? 0) + 1;
+    }
+  }
 
   return (
     <CollapsiblePanel
@@ -91,13 +108,20 @@ function DeviceSection({
             result.online ? "" : "opacity-60 saturate-50"
           }`}
         >
-          {projects.map((p) => (
+          {projects.map((p) => {
+            const attentionCount = attentionByPath[p.path] ?? 0;
+            const approvalCount = approvalsByPath[p.path] ?? 0;
+            return (
             <div
               key={p.id}
               className={`group relative overflow-hidden rounded-3xl border glass shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift ${
-                result.online && p.runningCount > 0
-                  ? "border-emerald-300 ring-2 ring-emerald-400/70"
-                  : "border-white/70"
+                approvalCount > 0
+                  ? "border-indigo-300 ring-2 ring-indigo-400/80"
+                  : attentionCount > 0
+                    ? "border-amber-300 ring-2 ring-amber-400/70"
+                    : result.online && p.runningCount > 0
+                      ? "border-emerald-300 ring-2 ring-emerald-400/70"
+                      : "border-white/70"
               }`}
             >
               <Link
@@ -105,12 +129,22 @@ function DeviceSection({
                 className="absolute inset-0 z-10"
                 aria-label={`Open ${p.name} on ${device.name}`}
               />
-              {result.online && p.runningCount > 0 && (
+              {approvalCount > 0 ? (
+                <div className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-soft">
+                  <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse-ring-indigo" />
+                  {approvalCount} to approve
+                </div>
+              ) : attentionCount > 0 ? (
+                <div className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-amber-700 shadow-soft">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse-ring" />
+                  {attentionCount} waiting
+                </div>
+              ) : result.online && p.runningCount > 0 ? (
                 <div className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-soft">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-ring-green" />
                   {p.runningCount} running
                 </div>
-              )}
+              ) : null}
               <div
                 className="h-20 w-full"
                 style={{ background: gradientFor(p.id) }}
@@ -138,7 +172,8 @@ function DeviceSection({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </CollapsiblePanel>

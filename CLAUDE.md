@@ -4,11 +4,13 @@ Local Next.js (App Router, TS, Tailwind) dashboard for managing **Claude Code se
 
 ## Multi-device (hub + agents)
 
-This Mac is the **hub**; other devices (second Mac, Windows) run the read-only **device agent** (`agent/index.ts`, port 3777, bearer-token auth) which serves their `~/.claude` over the LAN. Shared read logic lives in `core/` (dependency-free, platform-neutral — used in-process by the hub for the local device and by agents on remotes; `lib/claude.ts` = core + hub-only sidecar overlays). The hub polls agents per request and keeps last-good snapshots in `~/.claude-hub/device-cache/` so offline devices still render (dimmed). Config: hub-side registry `~/.claude-hub/devices.json`; agent-side `~/.claude-hub/agent.json` (token generated on first run). Remote UI is read-only at `/devices/[deviceId]/...`; remote REST under `/api/devices/*`. Full details + install steps: `docs/DEVICES.md`.
+This Mac is the **hub**; other devices (second Mac, Windows) run the **device agent** (`agent/index.ts`, port 3777, bearer-token auth) which serves their `~/.claude` over the LAN (read-only except `POST /v1/approval-mode`, which writes that device's approval-mode sidecar). Shared read logic lives in `core/` (dependency-free, platform-neutral — used in-process by the hub for the local device and by agents on remotes; `lib/claude.ts` = core + hub-only sidecar overlays). The hub polls agents per request and keeps last-good snapshots in `~/.claude-hub/device-cache/` so offline devices still render (dimmed). Config: hub-side registry `~/.claude-hub/devices.json`; agent-side `~/.claude-hub/agent.json` (token generated on first run). Remote UI is read-only at `/devices/[deviceId]/...`; remote REST under `/api/devices/*`.
+
+**Cross-device notifications/approvals (phase 2):** the hooks read `~/.claude-hub/hub.json` (`{url, deviceId}`, written by `hooks/install.py --hub-url ... --device-id ...`); absent → local `127.0.0.1:3000`, original behavior. Remote events/approvals arrive tagged with `deviceId`, so attention + approvals (`attention.json`/`approvals.json`, keyed by session id) work for any device's sessions; the bell/tray link to `/devices/<id>/...`. Approval-mode for remote sessions is toggled via the agent (it writes that device's `approval-mode.json`, which its own approve-hook reads). Full details + install steps: `docs/DEVICES.md`.
 
 ## ⚠️ Parts of this system live OUTSIDE this repo
 
-Several behaviors are NOT implemented in this codebase. Grepping the repo will not find them — they live in the user's home dir:
+The hook *sources* are vendored in `hooks/` (installed to `~/.claude-hub/` by `hooks/install.py`), but the LIVE copies and all hook wiring are in the home dir — editing `hooks/*.py` does nothing until re-installed:
 
 | Concern | Where it actually lives | In this repo? |
 |---|---|---|
